@@ -1,91 +1,122 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'product_model.dart';
 
-class ProductDetailPage extends StatelessWidget {
-  final Product product;
+class ProductDetailPage extends StatefulWidget {
+  final Product? product;
 
-  const ProductDetailPage({super.key, required this.product});
+  const ProductDetailPage({super.key, this.product});
+
+  @override
+  _ProductDetailPageState createState() => _ProductDetailPageState();
+}
+
+class _ProductDetailPageState extends State<ProductDetailPage> {
+  final _formKey = GlobalKey<FormState>();
+  late String name, description;
+  late double price;
+  late int stock;
+  bool isEdit = false;
+
+  final String apiUrl = "http://localhost/crud_products/api.php";
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.product != null) {
+      isEdit = true;
+      name = widget.product!.name;
+      price = widget.product!.price;
+      stock = widget.product!.stock;
+      description = widget.product!.description;
+    } else {
+      name = '';
+      price = 0.0;
+      stock = 0;
+      description = '';
+    }
+  }
+
+  Future<void> saveProduct() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      try {
+        if (isEdit) {
+          // Update (PUT)
+          await http.put(
+            Uri.parse(apiUrl),
+            body: {
+              'id': widget.product!.id.toString(),
+              'name': name,
+              'price': price.toString(),
+              'stock': stock.toString(),
+              'description': description,
+            },
+          );
+        } else {
+          // Create (POST)
+          await http.post(
+            Uri.parse(apiUrl),
+            body: {
+              'name': name,
+              'price': price.toString(),
+              'stock': stock.toString(),
+              'description': description,
+            },
+          );
+        }
+        Navigator.pop(context);
+      } catch (e) {
+        print("Error saving: $e");
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFDFCDC), // Soft Cream Pastel
       appBar: AppBar(
-        title: Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        backgroundColor: const Color(0xFFD8E2DC), // Pastel Mint/Sage
-        elevation: 0,
+        title: Text(isEdit ? 'Edit Produk' : 'Tambah Produk Baru'),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 300,
-              width: double.infinity,
-              color: Colors.white,
-              child: Image.network(product.thumbnail, fit: BoxFit.contain),
-            ),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              TextFormField(
+                initialValue: name,
+                decoration: const InputDecoration(labelText: 'Nama Produk'),
+                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                onSaved: (value) => name = value!,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          product.title,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Text(
-                        "\$${product.price}",
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFB5838D)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 20),
-                      const SizedBox(width: 4),
-                      Text("${product.rating} / 5.0", style: const TextStyle(fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                  const Divider(height: 30),
-                  const Text("Deskripsi Produk", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(
-                    product.description,
-                    style: TextStyle(color: Colors.grey[700], height: 1.5),
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFCAD4), // Pastel Peach
-                        foregroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Produk berhasil ditambahkan ke keranjang!')),
-                        );
-                      },
-                      child: const Text("Beli Sekarang", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+              TextFormField(
+                initialValue: price == 0.0 ? '' : price.toString(),
+                decoration: const InputDecoration(labelText: 'Harga'),
+                keyboardType: TextInputType.number,
+                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                onSaved: (value) => price = double.parse(value!),
               ),
-            ),
-          ],
+              TextFormField(
+                initialValue: stock == 0 ? '' : stock.toString(),
+                decoration: const InputDecoration(labelText: 'Stok'),
+                keyboardType: TextInputType.number,
+                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                onSaved: (value) => stock = int.parse(value!),
+              ),
+              TextFormField(
+                initialValue: description,
+                decoration: const InputDecoration(labelText: 'Deskripsi'),
+                maxLines: 3,
+                onSaved: (value) => description = value ?? '',
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: saveProduct,
+                child: Text(isEdit ? 'Perbarui' : 'Simpan'),
+              ),
+            ],
+          ),
         ),
       ),
     );
